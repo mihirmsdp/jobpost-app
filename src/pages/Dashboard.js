@@ -31,7 +31,7 @@ import AddIcon from "@mui/icons-material/Add";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy"; // Import Copy Icon
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 
@@ -58,10 +58,9 @@ function Dashboard() {
     }
     setUser(user);
 
-    // Fetch jobs AND the count of related applications
     const { data, error } = await supabase
       .from("jobs")
-      .select("*, applications(count)") // This is the key change!
+      .select("*, applications(count)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
@@ -87,12 +86,10 @@ function Dashboard() {
     navigate("/login");
   };
 
-  // Helper function to get username from email
   const getUsername = (email) => {
     return email.split("@")[0];
   };
 
-  // Function to copy the public job link
   const copyJobLink = (username, slug) => {
     const link = `${window.location.origin}/apply/${username}/${slug}`;
     navigator.clipboard.writeText(link);
@@ -100,16 +97,11 @@ function Dashboard() {
   };
 
   const handleDeleteJob = async (jobId) => {
-    if (
-      window.confirm(
-        "Are you sure you want to delete this job posting? This action cannot be undone."
-      )
-    ) {
+    if (window.confirm("Are you sure you want to delete this job posting?")) {
       const { error } = await supabase.from("jobs").delete().eq("id", jobId);
       if (error) {
         alert("Error deleting job: " + error.message);
       } else {
-        // Refresh the job list
         setJobs(jobs.filter((job) => job.id !== jobId));
       }
     }
@@ -245,6 +237,7 @@ function Dashboard() {
                   <TableCell>JOB TITLE</TableCell>
                   <TableCell>STATUS</TableCell>
                   <TableCell>APPLICANTS</TableCell>
+                  <TableCell>DATE POSTED</TableCell>
                   <TableCell align="right">ACTIONS</TableCell>
                 </TableRow>
               </TableHead>
@@ -263,9 +256,14 @@ function Dashboard() {
                       </Typography>
                     </TableCell>
                     <TableCell>{renderStatusChip(job.status)}</TableCell>
+                    <TableCell>{job.applications[0]?.count || 0}</TableCell>
                     <TableCell>
-                      {/* Supabase returns the count in an array */}
-                      {job.applications[0]?.count || 0}
+                      {/* --- DATE FORMATTING CHANGE HERE --- */}
+                      {new Date(job.created_at).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}
                     </TableCell>
                     <TableCell align="right">
                       <Stack

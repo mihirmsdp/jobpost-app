@@ -5,6 +5,7 @@ import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import CreateJob from './pages/CreateJob';
 import PublicJobPage from './pages/PublicJobPage';
+import ViewApplications from './pages/ViewApplications';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/jobs/create" element={<CreateJob />} />
+        <Route path="/jobs/:jobId/applications" element={<ViewApplications />} />
         <Route path="/apply/:username/:slug" element={<PublicJobPage />} />
       </Routes>
     </BrowserRouter>
