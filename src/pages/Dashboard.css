@@ -1,0 +1,13 @@
+/* Dashboard.css */
+
+.dashboard-page {
+  background-color: #f4f6f8; /* A standard light grey background */
+  min-height: 100vh;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
