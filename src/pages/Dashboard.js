@@ -86,7 +86,7 @@ function Dashboard() {
         const statsData = {
           totalApplications: applicationsData.length,
           shortlisted: applicationsData.filter(
-            (app) => app.status === "shortlisted"
+            (app) => app.status === "shortlisted" || app.status === "interviewing"
           ).length,
           onboarded: applicationsData.filter((app) => app.status === "hired")
             .length,
