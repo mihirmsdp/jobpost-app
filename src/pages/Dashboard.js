@@ -1,12 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
-import {
-  Container,
-  Box,
-  Typography,
-  CircularProgress,
-} from "@mui/material";
+import { Container, Box, Typography, CircularProgress } from "@mui/material";
 
 // Component Imports
 import DashboardHeader from "../components/DashboardHeader";
@@ -23,6 +18,7 @@ import PlaylistRemoveIcon from "@mui/icons-material/PlaylistRemove";
 function Dashboard() {
   const [user, setUser] = useState(null);
   const [jobs, setJobs] = useState([]);
+  const [interviews, setInterviews] = useState([]);
   const [stats, setStats] = useState({
     totalApplications: 16,
     shortlisted: 0,
@@ -48,6 +44,7 @@ function Dashboard() {
     }
     setUser(user);
 
+    // Fetch Jobs
     const { data: jobsData, error: jobsError } = await supabase
       .from("jobs")
       .select("*, applications(count)")
@@ -60,6 +57,21 @@ function Dashboard() {
       setJobs(jobsData || []);
     }
 
+    // Fetch Interviews
+    const { data: interviewsData, error: interviewsError } = await supabase
+      .from("interview_schedules")
+      .select(`*, jobs (title)`)
+      .eq("user_id", user.id)
+      .eq("status", "scheduled")
+      .gte("interview_date", new Date().toISOString());
+
+    if (interviewsError) {
+      console.error("Error fetching interviews:", interviewsError);
+    } else {
+      setInterviews(interviewsData || []);
+    }
+
+    // Calculate Stats
     if (jobsData && jobsData.length > 0) {
       const { data: applicationsData, error: applicationsError } =
         await supabase
@@ -95,6 +107,54 @@ function Dashboard() {
     setLoading(false);
   };
 
+  const calendarEvents = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const typeToColor = {
+      phone: "#2196f3",
+      video: "#9c27b0",
+      "in-person": "#ff9800",
+      default: "#607d8b",
+    };
+
+    return interviews
+      .map((interview) => {
+        const interviewDate = new Date(interview.interview_date);
+        const interviewDay = new Date(interviewDate);
+        interviewDay.setHours(0, 0, 0, 0);
+
+        let type = "upcoming";
+        let displayDate = interviewDate.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        });
+
+        if (interviewDay.getTime() === today.getTime()) {
+          type = "today";
+          displayDate = interviewDate.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+          });
+        } else if (interviewDay.getTime() === tomorrow.getTime()) {
+          displayDate = "Tomorrow";
+        }
+
+        return {
+          type: type,
+          title: interview.applicant_name,
+          status: interview.jobs?.title || "Unknown Job",
+          date: displayDate,
+          color: typeToColor[interview.interview_type] || typeToColor.default,
+        };
+      })
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+  }, [interviews]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/login");
@@ -123,30 +183,6 @@ function Dashboard() {
     }
   };
 
-  const calendarEvents = [
-    {
-      type: "today",
-      title: "UI/UX Engineer",
-      status: "Interview",
-      date: "Today",
-      color: "#9c27b0",
-    },
-    {
-      type: "upcoming",
-      title: "Frontend Developer",
-      status: "Review",
-      date: "Tomorrow",
-      color: "#2196f3",
-    },
-    {
-      type: "upcoming",
-      title: "Backend Engineer",
-      status: "Screening",
-      date: "May 22",
-      color: "#ff9800",
-    },
-  ];
-
   if (loading) {
     return (
       <Box
@@ -170,7 +206,7 @@ function Dashboard() {
         onLogout={handleLogout}
         onNewJob={() => navigate("/jobs/create")}
       />
-      
+
       <Container maxWidth="xl" sx={{ py: 3 }}>
         {/* Main Grid Layout - Two Columns with Fixed Heights */}
         <Box
@@ -266,7 +302,9 @@ function Dashboard() {
         {/* Jobs Table - Full Width Below */}
         <JobsTable
           jobs={jobs}
-          onViewApplications={(jobId) => navigate(`/jobs/${jobId}/applications`)}
+          onViewApplications={(jobId) =>
+            navigate(`/jobs/${jobId}/applications`)
+          }
           onEditJob={(jobId) => navigate(`/jobs/${jobId}/edit`)}
           onDeleteJob={handleDeleteJob}
           onCopyLink={copyJobLink}

@@ -21,11 +21,16 @@ import {
   FormControl,
   Chip,
   Tooltip,
+  IconButton,
 } from "@mui/material";
 
 // Icon Imports
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DescriptionIcon from "@mui/icons-material/Description";
+import EventIcon from "@mui/icons-material/Event";
+
+// Component Import
+import ScheduleInterviewDialog from "../components/ScheduleInterviewDialog";
 
 function ViewApplications() {
   const { jobId } = useParams();
@@ -35,12 +40,12 @@ function ViewApplications() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState(null);
 
   const fetchApplications = useCallback(async () => {
     setLoading(true);
 
-    // --- UPDATED LOGIC ---
-    // Call the RPC function to securely fetch job and application data
     const { data, error } = await supabase.rpc("get_job_with_applications", {
       job_id_param: jobId,
     });
@@ -49,7 +54,7 @@ function ViewApplications() {
       console.error("Error fetching applications via RPC:", error);
       setError("Could not load application data. Please try again.");
     } else {
-      setJob(data); // The RPC returns the 'title' directly in the data object
+      setJob(data);
       const sortedApplications = data.applications.sort(
         (a, b) => new Date(b.applied_at) - new Date(a.applied_at)
       );
@@ -61,7 +66,6 @@ function ViewApplications() {
   useEffect(() => {
     fetchApplications();
 
-    // --- Realtime Subscription ---
     const channel = supabase
       .channel(`applications-for-job-${jobId}`)
       .on(
@@ -104,6 +108,15 @@ function ViewApplications() {
       setApplications(originalApplications);
       alert("Failed to update status. Please try again.");
     }
+  };
+
+  const handleScheduleClick = (application) => {
+    setSelectedApplication(application);
+    setScheduleDialogOpen(true);
+  };
+
+  const handleScheduled = () => {
+    fetchApplications(); // Refresh to update status
   };
 
   const formatDate = (dateString) => {
@@ -197,7 +210,7 @@ function ViewApplications() {
                     <TableCell>APPLIED ON</TableCell>
                     <TableCell>AI SCORE</TableCell>
                     <TableCell>STATUS</TableCell>
-                    <TableCell align="right">RESUME</TableCell>
+                    <TableCell align="center">ACTIONS</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -259,16 +272,28 @@ function ViewApplications() {
                           </Select>
                         </FormControl>
                       </TableCell>
-                      <TableCell align="right">
-                        <Button
-                          startIcon={<DescriptionIcon />}
-                          href={app.resume_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          size="small"
-                        >
-                          View
-                        </Button>
+                      <TableCell align="center">
+                        <Box sx={{ display: "flex", gap: 1, justifyContent: "center" }}>
+                          <Tooltip title="Schedule Interview">
+                            <IconButton
+                              color="primary"
+                              size="small"
+                              onClick={() => handleScheduleClick(app)}
+                            >
+                              <EventIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="View Resume">
+                            <IconButton
+                              size="small"
+                              href={app.resume_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <DescriptionIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -278,6 +303,16 @@ function ViewApplications() {
           )}
         </Paper>
       </Container>
+
+      {/* Schedule Interview Dialog */}
+      <ScheduleInterviewDialog
+        open={scheduleDialogOpen}
+        onClose={() => setScheduleDialogOpen(false)}
+        application={selectedApplication}
+        jobTitle={job?.title}
+        onScheduled={handleScheduled}
+        jobId={jobId}
+      />
     </Box>
   );
 }

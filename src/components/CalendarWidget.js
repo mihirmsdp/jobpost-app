@@ -36,7 +36,30 @@ function CalendarWidget({ events = [] }) {
         {formattedDate}
       </Typography>
 
-      <Box sx={{ flex: 1, overflow: "auto" }}>
+      {/* This Box is now explicitly scrollable with a fixed max height */}
+      <Box
+        sx={{
+          flex: 1,
+          overflowY: "auto",
+          pr: 1,
+          maxHeight: 280, // <-- ADDED THIS LINE to enforce a maximum height
+          // Custom scrollbar styling for a cleaner look
+          "&::-webkit-scrollbar": {
+            width: "6px",
+          },
+          "&::-webkit-scrollbar-track": {
+            backgroundColor: "transparent",
+          },
+          "&::-webkit-scrollbar-thumb": {
+            backgroundColor: "#ccc",
+            borderRadius: "10px",
+            "&:hover": {
+              backgroundColor: "#aaa",
+            },
+          },
+        }}
+      >
+        {/* The rest of the component remains the same */}
         {todayEvents.length > 0 && (
           <>
             <Typography
