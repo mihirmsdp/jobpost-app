@@ -204,7 +204,7 @@ function Dashboard() {
       <DashboardHeader
         user={user}
         onLogout={handleLogout}
-        onNewJob={() => navigate("/jobs/create")}
+        onNewJob={() => navigate("/create-job")}
       />
 
       <Container maxWidth="xl" sx={{ py: 3 }}>

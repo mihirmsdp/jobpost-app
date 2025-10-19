@@ -65,7 +65,7 @@ function App() {
           path="/signup"
           element={session ? <Navigate to="/dashboard" /> : <Signup />}
         />
-        <Route path="/jobs/:slug" element={<PublicJobPage />} />
+        <Route path="/apply/:username/:slug" element={<PublicJobPage />} />
 
         {/* Protected Routes */}
         <Route
