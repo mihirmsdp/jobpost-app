@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { useEmailService } from "../hooks/useEmailService";
 
 // Material-UI Imports
 import {
@@ -42,6 +43,7 @@ function ViewApplications() {
   const [error, setError] = useState("");
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState(null);
+  const { sendStatusUpdate } = useEmailService();
 
   const fetchApplications = useCallback(async () => {
     setLoading(true);
@@ -98,15 +100,51 @@ function ViewApplications() {
     );
     setApplications(updatedApplications);
 
-    const { error } = await supabase
-      .from("applications")
-      .update({ status: newStatus })
-      .eq("id", applicationId);
+    try {
+      const { error } = await supabase
+        .from("applications")
+        .update({ status: newStatus })
+        .eq("id", applicationId);
 
-    if (error) {
-      console.error("Failed to update status:", error);
+      if (error) {
+        console.error("Failed to update status:", error);
+        setApplications(originalApplications);
+        alert("Failed to update status. Please try again.");
+        return;
+      }
+
+      // Find the application that was updated
+      const updatedApp = applications.find((app) => app.id === applicationId);
+
+      if (updatedApp) {
+        // Only send email for certain status changes (optional)
+        const statusesToNotify = [
+          "shortlisted",
+          "rejected",
+          "hired",
+          "interviewing",
+        ];
+
+        if (statusesToNotify.includes(newStatus)) {
+          const emailResult = await sendStatusUpdate(
+            updatedApp.email,
+            updatedApp.full_name,
+            job.title,
+            newStatus
+          );
+
+          if (!emailResult.success) {
+            console.warn("Status email not sent:", emailResult.error);
+            // Email failure shouldn't block status updates
+          } else {
+            console.log("Status update email sent successfully");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error updating status:", error);
       setApplications(originalApplications);
-      alert("Failed to update status. Please try again.");
+      alert("An error occurred. Please try again.");
     }
   };
 
@@ -273,7 +311,13 @@ function ViewApplications() {
                         </FormControl>
                       </TableCell>
                       <TableCell align="center">
-                        <Box sx={{ display: "flex", gap: 1, justifyContent: "center" }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 1,
+                            justifyContent: "center",
+                          }}
+                        >
                           <Tooltip title="Schedule Interview">
                             <IconButton
                               color="primary"

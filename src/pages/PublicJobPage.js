@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { useEmailService } from "../hooks/useEmailService";
 
 // Material-UI Imports
 import {
@@ -41,6 +42,7 @@ function PublicJobPage() {
     portfolioUrl: "",
   });
   const [resumeFile, setResumeFile] = useState(null);
+  const { sendApplicationConfirmation } = useEmailService();
 
   useEffect(() => {
     const loadJob = async () => {
@@ -167,10 +169,23 @@ function PublicJobPage() {
 
       console.log("Application updated with resume URL");
 
-      // 5. Mark as submitted first (so user sees success)
+      // 5. Send confirmation email
+      const emailResult = await sendApplicationConfirmation(
+        formData.email,
+        formData.fullName,
+        job.title,
+        job.company_name
+      );
+
+      if (!emailResult.success) {
+        console.warn("Email sending failed:", emailResult.error);
+        // Don't throw - email failure shouldn't block the application
+      }
+
+      // 6. Mark as submitted first (so user sees success)
       setSubmitted(true);
 
-      // 6. Trigger AI screening in background (after success screen)
+      // 7. Trigger AI screening in background (after success screen)
       setTimeout(async () => {
         try {
           console.log("Triggering AI screening for:", applicationId);
@@ -188,7 +203,7 @@ function PublicJobPage() {
         } catch (err) {
           console.error("AI screening exception:", err);
         }
-      }, 2000); // Wait 2 seconds after submission
+      }, 2000);
     } catch (error) {
       console.error("=== Submission Error ===");
       console.error(error);
