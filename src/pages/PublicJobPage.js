@@ -98,6 +98,8 @@ function PublicJobPage() {
     }
 
     try {
+      console.log("=== Starting Application Submission ===");
+
       // 1. Insert application data first to get a unique ID
       const { data: appData, error: insertError } = await supabase
         .from("applications")
@@ -107,7 +109,7 @@ function PublicJobPage() {
             full_name: formData.fullName,
             email: formData.email,
             phone: formData.phone,
-            resume_url: "pending", // Placeholder until file is uploaded
+            resume_url: "pending",
             cover_letter: formData.coverLetter,
             linkedin_url: formData.linkedinUrl,
             portfolio_url: formData.portfolioUrl,
@@ -117,13 +119,19 @@ function PublicJobPage() {
         .select()
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error("Insert error:", insertError);
+        throw insertError;
+      }
 
       const applicationId = appData.id;
+      console.log("Application created:", applicationId);
 
       // 2. Upload the resume
       const fileExt = resumeFile.name.split(".").pop();
       const filePath = `resumes/${applicationId}.${fileExt}`;
+
+      console.log("Uploading resume to:", filePath);
 
       const { error: uploadError } = await supabase.storage
         .from("applications")
@@ -132,44 +140,59 @@ function PublicJobPage() {
           metadata: { applicationId: applicationId },
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        throw uploadError;
+      }
 
-      // 3. Get the public URL of the uploaded file
+      console.log("Resume uploaded successfully");
+
+      // 3. Get the public URL
       const { data: urlData } = supabase.storage
         .from("applications")
         .getPublicUrl(filePath);
 
-      // 4. Update the application record with the final resume URL
+      console.log("Resume URL:", urlData.publicUrl);
+
+      // 4. Update the application with the resume URL
       const { error: updateError } = await supabase
         .from("applications")
         .update({ resume_url: urlData.publicUrl })
         .eq("id", applicationId);
 
-      if (updateError) throw updateError;
-
-      // 5. Trigger AI screening - ADDED THIS
-      try {
-        console.log("Calling AI screening for application:", applicationId);
-
-        const { data: functionData, error: functionError } =
-          await supabase.functions.invoke("ai-screen-resume", {
-            body: { applicationId: applicationId },
-          });
-
-        if (functionError) {
-          console.error("AI screening error:", functionError);
-        } else {
-          console.log("AI screening response:", functionData);
-        }
-      } catch (aiError) {
-        console.error("AI screening failed:", aiError);
+      if (updateError) {
+        console.error("Update error:", updateError);
+        throw updateError;
       }
-      // 6. Success
+
+      console.log("Application updated with resume URL");
+
+      // 5. Mark as submitted first (so user sees success)
       setSubmitted(true);
+
+      // 6. Trigger AI screening in background (after success screen)
+      setTimeout(async () => {
+        try {
+          console.log("Triggering AI screening for:", applicationId);
+
+          const { data: aiData, error: aiError } =
+            await supabase.functions.invoke("ai-screen-resume", {
+              body: { applicationId: applicationId },
+            });
+
+          if (aiError) {
+            console.error("AI screening failed:", aiError);
+          } else {
+            console.log("AI screening triggered:", aiData);
+          }
+        } catch (err) {
+          console.error("AI screening exception:", err);
+        }
+      }, 2000); // Wait 2 seconds after submission
     } catch (error) {
-      console.error("Submission error:", error);
+      console.error("=== Submission Error ===");
+      console.error(error);
       setError(`Submission failed: ${error.message}. Please try again.`);
-    } finally {
       setApplying(false);
     }
   };

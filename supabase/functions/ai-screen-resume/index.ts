@@ -5,11 +5,23 @@ const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
 if (!GEMINI_API_KEY) {
   console.error("GEMINI_API_KEY not configured");
 }
 
 Deno.serve(async (req: Request) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     console.log("=== AI Resume Screening Started ===");
 
@@ -21,7 +33,8 @@ Deno.serve(async (req: Request) => {
     });
 
     const payload = await req.json();
-    const applicationId = payload.applicationId;
+    const applicationId =
+      payload.applicationId || payload.record?.metadata?.applicationId;
 
     if (!applicationId) {
       throw new Error("Missing applicationId");
@@ -195,7 +208,7 @@ Evaluate the candidate's experience, skills, and fit for this role.`;
       }),
       {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   } catch (error) {
@@ -209,7 +222,7 @@ Evaluate the candidate's experience, skills, and fit for this role.`;
       }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }
