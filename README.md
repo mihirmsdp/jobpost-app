@@ -1,70 +1,96 @@
-# Getting Started with Create React App
+# JobPost: AI-Powered Recruitment Platform
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+JobPost is a modern, AI-driven application designed to streamline the hiring process for companies of all sizes. It replaces cumbersome spreadsheets and endless email chains with an intelligent, centralized dashboard, helping recruiters find and hire top talent faster.
 
-## Available Scripts
+## ✨ Core Features
 
-In the project directory, you can run:
+  * **Instant Job Posting**: Create and publish beautiful, detailed job listings in minutes.
+  * **AI-Powered Screening**: Automatically screen and score candidates based on job requirements to instantly identify top applicants.
+  * **Centralized Dashboard**: Track all jobs, applications, and interviews from a single, intuitive interface.
+  * **Applicant Management**: View candidate details, manage their status (shortlisted, rejected, hired), and schedule interviews.
+  * **Public Job Pages**: Each job posting gets a clean, public-facing URL that's easy to share. (e.g., `/apply/your-company/job-slug`)
+  * **Interview Scheduling**: Keep track of upcoming interviews with an integrated calendar widget.
+  * **Responsive Design**: A seamless experience whether you're on a desktop or a mobile device.
 
-### `npm start`
+-----
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## 🛠️ Tech Stack
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+This project is built with a modern, scalable tech stack:
 
-### `npm test`
+  * **Frontend**: [React](https://reactjs.org/)
+  * **UI Framework**: [Material-UI (MUI)](https://mui.com/)
+  * **Backend & Database**: [Supabase](https://supabase.io/) (PostgreSQL, Authentication, Storage)
+  * **Routing**: [React Router](https://reactrouter.com/)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+-----
 
-### `npm run build`
+## 🚀 Getting Started
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Follow these instructions to get a local copy of the project up and running.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Prerequisites
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+  * Node.js (v16 or later)
+  * npm or yarn
+  * A free [Supabase](https://supabase.io/) account
 
-### `npm run eject`
+### Installation
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+1.  **Clone the repository:**
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+    ```sh
+    git clone https://github.com/mihirmsdp/jobpost-app.git
+    cd jobpost-app
+    ```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+2.  **Install NPM packages:**
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+    ```sh
+    npm install
+    ```
 
-## Learn More
+3.  **Set up your environment variables:**
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+      * Create a file named `.env` in the root of your project.
+      * Log in to your Supabase dashboard and find your Project URL and `anon` Public Key in **Project Settings \> API**.
+      * Add them to your `.env` file like this:
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+    <!-- end list -->
 
-### Code Splitting
+    ```env
+    REACT_APP_SUPABASE_URL=YOUR_SUPABASE_PROJECT_URL
+    REACT_APP_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+    ```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+4.  **Set up Supabase Database Tables:**
+    You will need to create the necessary tables in your Supabase database. You can use the SQL editor in the Supabase dashboard to run scripts for creating `jobs`, `applications`, and `interview_schedules` tables. *Make sure to enable Row Level Security (RLS) for your tables.*
 
-### Analyzing the Bundle Size
+5.  **Run the development server:**
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+    ```sh
+    npm start
+    ```
 
-### Making a Progressive Web App
+    The application should now be running on [http://localhost:3000](https://www.google.com/search?q=http://localhost:3000).
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+-----
 
-### Advanced Configuration
+## 📁 Project Structure
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+The project follows a standard React application structure:
 
-### Deployment
+```
+/src
+|-- /components   # Reusable UI components (JobsTable, CalendarWidget, etc.)
+|-- /lib          # Supabase client configuration
+|-- /pages        # Top-level page components (Dashboard, Login, LandingPage, etc.)
+|-- App.js        # Main application component with routing logic
+|-- index.js      # Application entry point
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+-----
 
-### `npm run build` fails to minify
+## 📄 License
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+This project is licensed under the MIT License. See the `LICENSE` file for details.
