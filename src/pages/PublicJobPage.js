@@ -1,463 +1,419 @@
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { supabase } from "../lib/supabase";
+
+// Material-UI Imports
+import {
+  Container,
+  Box,
+  Typography,
+  CircularProgress,
+  Paper,
+  Grid,
+  TextField,
+  Button,
+  Alert,
+  Chip,
+  Stack,
+} from "@mui/material";
+import BusinessCenterIcon from "@mui/icons-material/BusinessCenter";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
+import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 
 function PublicJobPage() {
-  const { username, slug } = useParams();
+  const { slug } = useParams();
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [applying, setApplying] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    coverLetter: '',
-    linkedinUrl: '',
-    portfolioUrl: ''
+    fullName: "",
+    email: "",
+    phone: "",
+    coverLetter: "",
+    linkedinUrl: "",
+    portfolioUrl: "",
   });
   const [resumeFile, setResumeFile] = useState(null);
 
   useEffect(() => {
+    const loadJob = async () => {
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("slug", slug)
+        .eq("status", "active")
+        .single();
+
+      if (error || !data) {
+        setError("Job not found or no longer active.");
+      } else {
+        setJob(data);
+      }
+      setLoading(false);
+    };
     loadJob();
   }, [slug]);
 
-  const loadJob = async () => {
-    // Find job by slug
-    const { data, error } = await supabase
-      .from('jobs')
-      .select('*')
-      .eq('slug', slug)
-      .eq('status', 'active')
-      .single();
-
-    if (error || !data) {
-      setError('Job not found or no longer active');
-      setLoading(false);
-      return;
-    }
-
-    setJob(data);
-    setLoading(false);
-  };
-
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Check file type
-      const allowedTypes = ['application/pdf', 'application/msword', 
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-      
+      const allowedTypes = [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ];
       if (!allowedTypes.includes(file.type)) {
-        alert('Please upload PDF or DOC file only');
+        alert("Please upload a PDF or DOC file only.");
         return;
       }
-
-      // Check file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB');
+        // 5MB
+        alert("File size must be less than 5MB.");
         return;
       }
-
       setResumeFile(file);
     }
-  };
-
-  const uploadResume = async () => {
-    if (!resumeFile) return null;
-
-    const fileExt = resumeFile.name.split('.').pop();
-    const fileName = `${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-    const filePath = `resumes/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('applications')
-      .upload(filePath, resumeFile);
-
-    if (uploadError) {
-      console.error('Upload error:', uploadError);
-      return null;
-    }
-
-    // Get public URL
-    const { data } = supabase.storage
-      .from('applications')
-      .getPublicUrl(filePath);
-
-    return data.publicUrl;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setApplying(true);
-    setError('');
+    setError("");
 
-    // Validate resume file
     if (!resumeFile) {
-      setError('Please upload your resume');
+      setError("Please upload your resume.");
       setApplying(false);
       return;
     }
 
-    // Upload resume
-    const resumeUrl = await uploadResume();
-    if (!resumeUrl) {
-      setError('Failed to upload resume. Please try again.');
-      setApplying(false);
-      return;
-    }
+    try {
+      // 1. Insert application data first to get a unique ID
+      const { data: appData, error: insertError } = await supabase
+        .from("applications")
+        .insert([
+          {
+            job_id: job.id,
+            full_name: formData.fullName,
+            email: formData.email,
+            phone: formData.phone,
+            resume_url: "pending", // Placeholder until file is uploaded
+            cover_letter: formData.coverLetter,
+            linkedin_url: formData.linkedinUrl,
+            portfolio_url: formData.portfolioUrl,
+            status: "new",
+          },
+        ])
+        .select()
+        .single();
 
-    // Submit application
-    const { error: insertError } = await supabase
-      .from('applications')
-      .insert([
-        {
-          job_id: job.id,
-          full_name: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
-          resume_url: resumeUrl,
-          cover_letter: formData.coverLetter,
-          linkedin_url: formData.linkedinUrl,
-          portfolio_url: formData.portfolioUrl,
-          status: 'new'
+      if (insertError) throw insertError;
+
+      const applicationId = appData.id;
+
+      // 2. Upload the resume
+      const fileExt = resumeFile.name.split(".").pop();
+      const filePath = `resumes/${applicationId}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("applications")
+        .upload(filePath, resumeFile, {
+          upsert: true,
+          metadata: { applicationId: applicationId },
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 3. Get the public URL of the uploaded file
+      const { data: urlData } = supabase.storage
+        .from("applications")
+        .getPublicUrl(filePath);
+
+      // 4. Update the application record with the final resume URL
+      const { error: updateError } = await supabase
+        .from("applications")
+        .update({ resume_url: urlData.publicUrl })
+        .eq("id", applicationId);
+
+      if (updateError) throw updateError;
+
+      // 5. Trigger AI screening - ADDED THIS
+      try {
+        console.log("Calling AI screening for application:", applicationId);
+
+        const { data: functionData, error: functionError } =
+          await supabase.functions.invoke("ai-screen-resume", {
+            body: { applicationId: applicationId },
+          });
+
+        if (functionError) {
+          console.error("AI screening error:", functionError);
+        } else {
+          console.log("AI screening response:", functionData);
         }
-      ]);
-
-    if (insertError) {
-      setError('Failed to submit application. Please try again.');
-      console.error('Insert error:', insertError);
+      } catch (aiError) {
+        console.error("AI screening failed:", aiError);
+      }
+      // 6. Success
+      setSubmitted(true);
+    } catch (error) {
+      console.error("Submission error:", error);
+      setError(`Submission failed: ${error.message}. Please try again.`);
+    } finally {
       setApplying(false);
-      return;
     }
-
-    // Success!
-    setSubmitted(true);
-    setApplying(false);
   };
 
   if (loading) {
     return (
-      <div style={styles.container}>
-        <div style={styles.loading}>Loading job...</div>
-      </div>
-    );
-  }
-
-  if (error && !job) {
-    return (
-      <div style={styles.container}>
-        <div style={styles.errorBox}>
-          <h2>😕 {error}</h2>
-          <p>The job posting you're looking for doesn't exist or is no longer available.</p>
-        </div>
-      </div>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
+          backgroundColor: "#f8f9fa",
+        }}
+      >
+        <CircularProgress />
+      </Box>
     );
   }
 
   if (submitted) {
     return (
-      <div style={styles.container}>
-        <div style={styles.successBox}>
-          <h2>✅ Application Submitted!</h2>
-          <p>Thank you for applying to <strong>{job.title}</strong> at {job.company_name}.</p>
-          <p>We'll review your application and get back to you soon.</p>
-        </div>
-      </div>
+      <Container maxWidth="sm" sx={{ py: 8 }}>
+        <Paper
+          elevation={3}
+          sx={{ p: 4, textAlign: "center", borderRadius: 3 }}
+        >
+          <CheckCircleOutlineIcon
+            color="success"
+            sx={{ fontSize: 60, mb: 2 }}
+          />
+          <Typography variant="h4" gutterBottom>
+            Application Submitted!
+          </Typography>
+          <Typography color="text.secondary">
+            Thank you for applying to <strong>{job.title}</strong> at{" "}
+            {job.company_name}. We'll review your application and get back to
+            you soon.
+          </Typography>
+        </Paper>
+      </Container>
+    );
+  }
+
+  if (error && !job) {
+    return (
+      <Container maxWidth="sm" sx={{ py: 8 }}>
+        <Paper
+          elevation={3}
+          sx={{ p: 4, textAlign: "center", borderRadius: 3 }}
+        >
+          <ErrorOutlineIcon color="error" sx={{ fontSize: 60, mb: 2 }} />
+          <Typography variant="h4" gutterBottom>
+            Job Not Found
+          </Typography>
+          <Typography color="text.secondary">{error}</Typography>
+        </Paper>
+      </Container>
     );
   }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.jobSection}>
-        <div style={styles.jobHeader}>
-          <h1 style={styles.jobTitle}>{job.title}</h1>
-          <div style={styles.jobMeta}>
-            <span>{job.company_name}</span>
-            <span>•</span>
-            <span>{job.location}</span>
-            <span>•</span>
-            <span>{job.job_type}</span>
-          </div>
-          {job.salary_range && (
-            <div style={styles.salary}>💰 {job.salary_range}</div>
-          )}
-        </div>
+    <Box sx={{ backgroundColor: "#f8f9fa", py: 5 }}>
+      <Container maxWidth="md">
+        <Grid container spacing={4}>
+          <Grid item xs={12}>
+            <Paper sx={{ p: 4, borderRadius: 3 }}>
+              <Typography
+                variant="h3"
+                component="h1"
+                fontWeight="bold"
+                gutterBottom
+              >
+                {job.title}
+              </Typography>
+              <Stack
+                direction="row"
+                spacing={2}
+                sx={{
+                  mb: 2,
+                  color: "text.secondary",
+                  flexWrap: "wrap",
+                  gap: 1,
+                }}
+              >
+                <Chip
+                  icon={<BusinessCenterIcon />}
+                  label={job.company_name}
+                  variant="outlined"
+                />
+                <Chip
+                  icon={<LocationOnIcon />}
+                  label={job.location}
+                  variant="outlined"
+                />
+                {job.salary_range && (
+                  <Chip
+                    icon={<MonetizationOnIcon />}
+                    label={job.salary_range}
+                    variant="outlined"
+                  />
+                )}
+              </Stack>
+              <Box sx={{ my: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  About the Role
+                </Typography>
+                <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
+                  {job.description}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Requirements
+                </Typography>
+                <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
+                  {job.requirements}
+                </Typography>
+              </Box>
+            </Paper>
+          </Grid>
 
-        <div style={styles.jobContent}>
-          <div style={styles.section}>
-            <h3>About the Role</h3>
-            <p style={styles.text}>{job.description}</p>
-          </div>
-
-          <div style={styles.section}>
-            <h3>Requirements</h3>
-            <p style={styles.text}>{job.requirements}</p>
-          </div>
-        </div>
-      </div>
-
-      <div style={styles.applicationSection}>
-        <h2 style={styles.formTitle}>Apply for this position</h2>
-        
-        {error && <div style={styles.errorMessage}>{error}</div>}
-
-        <form onSubmit={handleSubmit}>
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Full Name *</label>
-            <input
-              type="text"
-              name="fullName"
-              value={formData.fullName}
-              onChange={handleChange}
-              required
-              style={styles.input}
-              placeholder="John Doe"
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Email *</label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              style={styles.input}
-              placeholder="john@example.com"
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Phone Number *</label>
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              required
-              style={styles.input}
-              placeholder="+1 234 567 8900"
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Resume (PDF or DOC) *</label>
-            <input
-              type="file"
-              onChange={handleFileChange}
-              accept=".pdf,.doc,.docx"
-              required
-              style={styles.fileInput}
-            />
-            {resumeFile && (
-              <div style={styles.fileName}>
-                Selected: {resumeFile.name}
-              </div>
-            )}
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Cover Letter (optional)</label>
-            <textarea
-              name="coverLetter"
-              value={formData.coverLetter}
-              onChange={handleChange}
-              style={styles.textarea}
-              placeholder="Tell us why you're a great fit for this role..."
-              rows="6"
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>LinkedIn URL (optional)</label>
-            <input
-              type="url"
-              name="linkedinUrl"
-              value={formData.linkedinUrl}
-              onChange={handleChange}
-              style={styles.input}
-              placeholder="https://linkedin.com/in/yourprofile"
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Portfolio URL (optional)</label>
-            <input
-              type="url"
-              name="portfolioUrl"
-              value={formData.portfolioUrl}
-              onChange={handleChange}
-              style={styles.input}
-              placeholder="https://yourportfolio.com"
-            />
-          </div>
-
-          <button 
-            type="submit" 
-            disabled={applying}
-            style={styles.submitBtn}
-          >
-            {applying ? 'Submitting...' : 'Submit Application'}
-          </button>
-        </form>
-      </div>
-    </div>
+          <Grid item xs={12}>
+            <Paper sx={{ p: 4, borderRadius: 3 }}>
+              <Typography variant="h4" component="h2" gutterBottom>
+                Apply for this position
+              </Typography>
+              <form onSubmit={handleSubmit}>
+                <Grid container spacing={2}>
+                  {error && (
+                    <Grid item xs={12}>
+                      <Alert severity="error">{error}</Alert>
+                    </Grid>
+                  )}
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      name="fullName"
+                      label="Full Name"
+                      value={formData.fullName}
+                      onChange={handleChange}
+                      required
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      name="email"
+                      label="Email Address"
+                      type="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      required
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      name="phone"
+                      label="Phone Number"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      required
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      fullWidth
+                      startIcon={<UploadFileIcon />}
+                    >
+                      Upload Resume (PDF, DOC) *
+                      <input
+                        type="file"
+                        hidden
+                        onChange={handleFileChange}
+                        accept=".pdf,.doc,.docx"
+                        required
+                      />
+                    </Button>
+                    {resumeFile && (
+                      <Typography
+                        variant="body2"
+                        sx={{ mt: 1, color: "text.secondary" }}
+                      >
+                        Selected: {resumeFile.name}
+                      </Typography>
+                    )}
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      name="coverLetter"
+                      label="Cover Letter (optional)"
+                      value={formData.coverLetter}
+                      onChange={handleChange}
+                      multiline
+                      rows={5}
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      name="linkedinUrl"
+                      label="LinkedIn URL (optional)"
+                      type="url"
+                      value={formData.linkedinUrl}
+                      onChange={handleChange}
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      name="portfolioUrl"
+                      label="Portfolio URL (optional)"
+                      type="url"
+                      value={formData.portfolioUrl}
+                      onChange={handleChange}
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      size="large"
+                      disabled={applying}
+                      fullWidth
+                    >
+                      {applying ? (
+                        <CircularProgress size={24} color="inherit" />
+                      ) : (
+                        "Submit Application"
+                      )}
+                    </Button>
+                  </Grid>
+                </Grid>
+              </form>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Container>
+    </Box>
   );
 }
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-    padding: '20px',
-  },
-  loading: {
-    textAlign: 'center',
-    padding: '40px',
-    fontSize: '18px',
-  },
-  errorBox: {
-    backgroundColor: 'white',
-    padding: '40px',
-    borderRadius: '8px',
-    textAlign: 'center',
-    maxWidth: '600px',
-    margin: '40px auto',
-  },
-  successBox: {
-    backgroundColor: 'white',
-    padding: '40px',
-    borderRadius: '8px',
-    textAlign: 'center',
-    maxWidth: '600px',
-    margin: '40px auto',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-  },
-  jobSection: {
-    backgroundColor: 'white',
-    padding: '30px',
-    borderRadius: '8px',
-    marginBottom: '24px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    maxWidth: '900px',
-    margin: '0 auto 24px auto',
-  },
-  jobHeader: {
-    borderBottom: '2px solid #f0f0f0',
-    paddingBottom: '20px',
-    marginBottom: '24px',
-  },
-  jobTitle: {
-    fontSize: '32px',
-    margin: '0 0 12px 0',
-    color: '#333',
-  },
-  jobMeta: {
-    fontSize: '16px',
-    color: '#666',
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap',
-  },
-  salary: {
-    fontSize: '18px',
-    color: '#1976d2',
-    marginTop: '8px',
-    fontWeight: '500',
-  },
-  jobContent: {
-    lineHeight: '1.6',
-  },
-  section: {
-    marginBottom: '24px',
-  },
-  text: {
-    whiteSpace: 'pre-wrap',
-    color: '#555',
-    fontSize: '15px',
-  },
-  applicationSection: {
-    backgroundColor: 'white',
-    padding: '30px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    maxWidth: '900px',
-    margin: '0 auto',
-  },
-  formTitle: {
-    marginBottom: '24px',
-    color: '#333',
-  },
-  inputGroup: {
-    marginBottom: '20px',
-  },
-  label: {
-    display: 'block',
-    marginBottom: '6px',
-    color: '#555',
-    fontSize: '14px',
-    fontWeight: '500',
-  },
-  input: {
-    width: '100%',
-    padding: '12px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px',
-  },
-  fileInput: {
-    width: '100%',
-    padding: '12px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px',
-  },
-  fileName: {
-    marginTop: '8px',
-    fontSize: '13px',
-    color: '#666',
-  },
-  textarea: {
-    width: '100%',
-    padding: '12px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px',
-    fontFamily: 'inherit',
-    resize: 'vertical',
-  },
-  submitBtn: {
-    width: '100%',
-    padding: '14px',
-    backgroundColor: '#1976d2',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: '16px',
-    cursor: 'pointer',
-    marginTop: '10px',
-    fontWeight: '500',
-  },
-  errorMessage: {
-    backgroundColor: '#fee',
-    color: '#c00',
-    padding: '12px',
-    borderRadius: '4px',
-    marginBottom: '20px',
-    fontSize: '14px',
-  }
-};
 
 export default PublicJobPage;
