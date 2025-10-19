@@ -1,87 +1,101 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
-
-// Material-UI Imports
 import {
   Container,
   Box,
   Typography,
-  Button,
   CircularProgress,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
-  IconButton,
-  AppBar,
-  Toolbar,
-  Menu,
-  MenuItem,
-  Avatar,
-  Stack,
 } from "@mui/material";
 
+// Component Imports
+import DashboardHeader from "../components/DashboardHeader";
+import StatsCard from "../components/StatsCard";
+import CalendarWidget from "../components/CalendarWidget";
+import JobsTable from "../components/JobsTable";
+
 // Icon Imports
-import AddIcon from "@mui/icons-material/Add";
-import VisibilityIcon from "@mui/icons-material/Visibility";
-import EditIcon from "@mui/icons-material/Edit";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
+import PersonSearchIcon from "@mui/icons-material/PersonSearch";
+import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
+import PlaylistRemoveIcon from "@mui/icons-material/PlaylistRemove";
 
 function Dashboard() {
   const [user, setUser] = useState(null);
   const [jobs, setJobs] = useState([]);
+  const [stats, setStats] = useState({
+    totalApplications: 16,
+    shortlisted: 0,
+    onboarded: 0,
+    rejected: 0,
+  });
   const [loading, setLoading] = useState(true);
-  const [anchorEl, setAnchorEl] = useState(null);
   const navigate = useNavigate();
 
-  const isMenuOpen = Boolean(anchorEl);
-
   useEffect(() => {
-    checkUserAndLoadJobs();
+    checkUserAndLoadData();
   }, []);
 
-  const checkUserAndLoadJobs = async () => {
+  const checkUserAndLoadData = async () => {
+    setLoading(true);
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
     if (!user) {
       navigate("/login");
       return;
     }
     setUser(user);
 
-    const { data, error } = await supabase
+    const { data: jobsData, error: jobsError } = await supabase
       .from("jobs")
       .select("*, applications(count)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("Error loading jobs:", error);
+    if (jobsError) {
+      console.error("Error loading jobs:", jobsError);
     } else {
-      setJobs(data);
+      setJobs(jobsData || []);
     }
+
+    if (jobsData && jobsData.length > 0) {
+      const { data: applicationsData, error: applicationsError } =
+        await supabase
+          .from("applications")
+          .select("status, job_id")
+          .in(
+            "job_id",
+            jobsData.map((j) => j.id)
+          );
+
+      if (!applicationsError && applicationsData) {
+        const statsData = {
+          totalApplications: applicationsData.length,
+          shortlisted: applicationsData.filter(
+            (app) => app.status === "shortlisted"
+          ).length,
+          onboarded: applicationsData.filter((app) => app.status === "hired")
+            .length,
+          rejected: applicationsData.filter((app) => app.status === "rejected")
+            .length,
+        };
+        setStats(statsData);
+      }
+    } else {
+      setStats({
+        totalApplications: 0,
+        shortlisted: 0,
+        onboarded: 0,
+        rejected: 0,
+      });
+    }
+
     setLoading(false);
   };
 
-  const handleProfileMenuOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleProfileMenuClose = () => {
-    setAnchorEl(null);
-  };
-
   const handleLogout = async () => {
-    handleProfileMenuClose();
     await supabase.auth.signOut();
     navigate("/login");
   };
@@ -90,8 +104,10 @@ function Dashboard() {
     return email.split("@")[0];
   };
 
-  const copyJobLink = (username, slug) => {
-    const link = `${window.location.origin}/apply/${username}/${slug}`;
+  const copyJobLink = (job) => {
+    const link = `${window.location.origin}/apply/${getUsername(user.email)}/${
+      job.slug
+    }`;
     navigator.clipboard.writeText(link);
     alert("Public job link copied to clipboard!");
   };
@@ -107,47 +123,29 @@ function Dashboard() {
     }
   };
 
-  const renderStatusChip = (status) => {
-    const isActive = status === "active";
-    return (
-      <Chip
-        icon={
-          <Box
-            component="span"
-            sx={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              backgroundColor: isActive ? "success.main" : "text.disabled",
-              display: "inline-block",
-              ml: "8px !important",
-            }}
-          />
-        }
-        label={isActive ? "Active" : "Inactive"}
-        variant="outlined"
-        size="small"
-        sx={{
-          borderColor: "transparent",
-          backgroundColor: isActive ? "success.light" : "#f0f0f0",
-          color: isActive ? "success.dark" : "text.secondary",
-          "& .MuiChip-label": { pd: "0 8px 0 2px" },
-        }}
-      />
-    );
-  };
-
-  const renderProfileMenu = (
-    <Menu
-      anchorEl={anchorEl}
-      anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-      transformOrigin={{ vertical: "top", horizontal: "right" }}
-      open={isMenuOpen}
-      onClose={handleProfileMenuClose}
-    >
-      <MenuItem onClick={handleLogout}>Logout</MenuItem>
-    </Menu>
-  );
+  const calendarEvents = [
+    {
+      type: "today",
+      title: "UI/UX Engineer",
+      status: "Interview",
+      date: "Today",
+      color: "#9c27b0",
+    },
+    {
+      type: "upcoming",
+      title: "Frontend Developer",
+      status: "Review",
+      date: "Tomorrow",
+      color: "#2196f3",
+    },
+    {
+      type: "upcoming",
+      title: "Backend Engineer",
+      status: "Screening",
+      date: "May 22",
+      color: "#ff9800",
+    },
+  ];
 
   if (loading) {
     return (
@@ -157,160 +155,122 @@ function Dashboard() {
           justifyContent: "center",
           alignItems: "center",
           minHeight: "100vh",
+          backgroundColor: "#fafafa",
         }}
       >
-        <CircularProgress />
+        <CircularProgress size={40} />
       </Box>
     );
   }
 
   return (
-    <Box sx={{ backgroundColor: "#f8f9fa", minHeight: "100vh" }}>
-      <AppBar
-        position="static"
-        color="transparent"
-        elevation={1}
-        sx={{ backgroundColor: "white" }}
-      >
-        <Toolbar>
-          <WorkOutlineIcon sx={{ mr: 1, color: "primary.main" }} />
-          <Typography
-            variant="h6"
-            component="div"
-            sx={{ flexGrow: 1, fontWeight: "bold" }}
-          >
-            JobPost
-          </Typography>
-          <IconButton
-            onClick={handleProfileMenuOpen}
-            size="large"
-            color="inherit"
-          >
-            <Avatar sx={{ width: 32, height: 32 }}>
-              <AccountCircleIcon />
-            </Avatar>
-          </IconButton>
-        </Toolbar>
-      </AppBar>
-      {renderProfileMenu}
-
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Paper
+    <Box sx={{ backgroundColor: "#fafafa", minHeight: "100vh" }}>
+      <DashboardHeader
+        user={user}
+        onLogout={handleLogout}
+        onNewJob={() => navigate("/jobs/create")}
+      />
+      
+      <Container maxWidth="xl" sx={{ py: 3 }}>
+        {/* Main Grid Layout - Two Columns with Fixed Heights */}
+        <Box
           sx={{
-            p: 3,
-            borderRadius: 3,
-            boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 3,
+            mb: 3,
+            alignItems: "stretch",
           }}
         >
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              mb: 3,
-            }}
-          >
-            <Typography variant="h5" component="h1" fontWeight="600">
-              Your Job Postings
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => navigate("/jobs/create")}
-              disableElevation
+          {/* Left Column - Stats Cards */}
+          <Box sx={{ display: "flex", flexDirection: "column" }}>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="h6" fontWeight={600}>
+                Overview
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Recruitment overview of this month
+              </Typography>
+            </Box>
+
+            {/* 2x2 Grid for Stats Cards */}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 2,
+                flex: 1,
+                rowGap: 5,
+                mb: 2.5,
+              }}
             >
-              New Job Posting
-            </Button>
+              {[
+                {
+                  icon: ArticleOutlinedIcon,
+                  value: stats.totalApplications,
+                  label: "Applications",
+                  theme: {
+                    gradient: "linear-gradient(135deg, #e3f2fd, #bbdefb)",
+                    iconBg: "#1e88e5",
+                    iconColor: "#fff",
+                  },
+                },
+                {
+                  icon: PersonSearchIcon,
+                  value: stats.shortlisted,
+                  label: "Shortlisted",
+                  theme: {
+                    gradient: "linear-gradient(135deg, #fff3e0, #ffe0b2)",
+                    iconBg: "#fb8c00",
+                    iconColor: "#fff",
+                  },
+                },
+                {
+                  icon: FactCheckOutlinedIcon,
+                  value: stats.onboarded,
+                  label: "Onboarded",
+                  theme: {
+                    gradient: "linear-gradient(135deg, #e8f5e9, #c8e6c9)",
+                    iconBg: "#43a047",
+                    iconColor: "#fff",
+                  },
+                },
+                {
+                  icon: PlaylistRemoveIcon,
+                  value: stats.rejected,
+                  label: "Rejected",
+                  theme: {
+                    gradient: "linear-gradient(135deg, #ffebee, #ffcdd2)",
+                    iconBg: "#e53935",
+                    iconColor: "#fff",
+                  },
+                },
+              ].map((card, i) => (
+                <StatsCard
+                  key={i}
+                  icon={card.icon}
+                  value={card.value}
+                  label={card.label}
+                  themeColors={card.theme}
+                />
+              ))}
+            </Box>
           </Box>
 
-          <TableContainer>
-            <Table sx={{ minWidth: 650 }}>
-              <TableHead
-                sx={{
-                  "& .MuiTableCell-root": {
-                    color: "text.secondary",
-                    fontWeight: "600",
-                  },
-                }}
-              >
-                <TableRow>
-                  <TableCell>JOB TITLE</TableCell>
-                  <TableCell>STATUS</TableCell>
-                  <TableCell>APPLICANTS</TableCell>
-                  <TableCell>DATE POSTED</TableCell>
-                  <TableCell align="right">ACTIONS</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {jobs.map((job) => (
-                  <TableRow
-                    key={job.id}
-                    sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
-                  >
-                    <TableCell component="th" scope="row">
-                      <Typography variant="body1" fontWeight="500">
-                        {job.title}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {job.company_name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{renderStatusChip(job.status)}</TableCell>
-                    <TableCell>{job.applications[0]?.count || 0}</TableCell>
-                    <TableCell>
-                      {/* --- DATE FORMATTING CHANGE HERE --- */}
-                      {new Date(job.created_at).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Stack
-                        direction="row"
-                        spacing={0.5}
-                        justifyContent="flex-end"
-                      >
-                        <IconButton
-                          title="Copy Public Link"
-                          size="small"
-                          onClick={() =>
-                            copyJobLink(getUsername(user.email), job.slug)
-                          }
-                        >
-                          <ContentCopyIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          title="View Applications"
-                          size="small"
-                          onClick={() =>
-                            navigate(`/jobs/${job.id}/applications`)
-                          }
-                        >
-                          <VisibilityIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          title="Edit Job"
-                          size="small"
-                          onClick={() => navigate(`/jobs/${job.id}/edit`)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          title="Delete Job"
-                          size="small"
-                          onClick={() => handleDeleteJob(job.id)}
-                        >
-                          <DeleteOutlineIcon fontSize="small" />
-                        </IconButton>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
+          {/* Right Column - Calendar Widget */}
+          <Box sx={{ display: "flex", flexDirection: "column" }}>
+            <CalendarWidget events={calendarEvents} />
+          </Box>
+        </Box>
+
+        {/* Jobs Table - Full Width Below */}
+        <JobsTable
+          jobs={jobs}
+          onViewApplications={(jobId) => navigate(`/jobs/${jobId}/applications`)}
+          onEditJob={(jobId) => navigate(`/jobs/${jobId}/edit`)}
+          onDeleteJob={handleDeleteJob}
+          onCopyLink={copyJobLink}
+        />
       </Container>
     </Box>
   );
